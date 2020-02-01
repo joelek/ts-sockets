@@ -48,5 +48,5 @@ server.send(connection_id, "räksmörgås");
 Install this package from GitHub.
 
 ```
-npm install -s joelek/ts-sockets
+npm install joelek/ts-sockets
 ```

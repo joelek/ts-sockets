@@ -2,13 +2,9 @@
 	"compilerOptions": {
 		"declaration": true,
 		"module": "commonjs",
-		"moduleResolution": "node",
-		"noImplicitAny": true,
-		"noImplicitReturns": true,
-		"noImplicitThis": true,
 		"outDir": "./build/",
 		"rootDir": "./source/",
-		"strictNullChecks": true,
+		"strict": true,
 		"target": "es6"
 	},
 	"include": [

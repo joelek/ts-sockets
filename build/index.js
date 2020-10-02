@@ -60,10 +60,10 @@ function decodeFrame(buffer) {
         key = buffer.slice(offset, offset + 4);
         offset += 4;
     }
-    let payload = buffer.slice(offset);
-    if (payload.length !== payload_length) {
+    if (offset + payload_length > buffer.length) {
         throw "Invalid frame encoding!";
     }
+    let payload = buffer.slice(offset, offset + payload_length);
     if (masked === 1) {
         for (let i = 0; i < payload.length; i++) {
             payload[i] = payload[i] ^ key[i & 0x03];

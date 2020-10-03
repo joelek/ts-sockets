@@ -19,5 +19,5 @@
 		"clean": "rm -rf ./build/ ./node_modules/",
 		"dist": "npm run build && git add ./build/ && git commit -m \"Generate build artifacts.\""
 	},
-	"version": "1.0.2"
+	"version": "1.0.3"
 }

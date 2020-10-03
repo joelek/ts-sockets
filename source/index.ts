@@ -64,43 +64,48 @@ type WebSocketFrame = {
 	payload: Buffer;
 };
 
-function decodeFrame(buffer: Buffer): WebSocketFrame {
-	let offset = 0;
-	let final = ((buffer.readUInt8(offset) >> 7) & 0x01);
-	let reserved1 = ((buffer.readUInt8(offset) >> 6) & 0x01);
-	let reserved2 = ((buffer.readUInt8(offset) >> 5) & 0x01);
-	let reserved3 = ((buffer.readUInt8(offset) >> 4) & 0x01);
-	let opcode = ((buffer.readUInt8(offset) >> 0) & 0x0F);
-	offset += 1;
-	let masked = ((buffer.readUInt8(1) >> 7) & 0x01);
-	let payload_length = ((buffer.readUInt8(1) >> 0) & 0x7F);
-	offset += 1;
+type State = {
+	buffer: Buffer,
+	offset: number
+};
+
+function decodeFrame(state: State): WebSocketFrame {
+	let final = ((state.buffer.readUInt8(state.offset) >> 7) & 0x01);
+	let reserved1 = ((state.buffer.readUInt8(state.offset) >> 6) & 0x01);
+	let reserved2 = ((state.buffer.readUInt8(state.offset) >> 5) & 0x01);
+	let reserved3 = ((state.buffer.readUInt8(state.offset) >> 4) & 0x01);
+	let opcode = ((state.buffer.readUInt8(state.offset) >> 0) & 0x0F);
+	state.offset += 1;
+	let masked = ((state.buffer.readUInt8(state.offset) >> 7) & 0x01);
+	let payload_length = ((state.buffer.readUInt8(state.offset) >> 0) & 0x7F);
+	state.offset += 1;
 	if (payload_length === 126) {
-		payload_length = buffer.readUInt16BE(offset);
-		offset += 2;
+		payload_length = state.buffer.readUInt16BE(state.offset);
+		state.offset += 2;
 		if (payload_length <= 125) {
 			throw "Invalid frame encoding!";
 		}
 	} else if (payload_length === 127) {
-		if (buffer.readUInt32BE(offset) !== 0) {
+		if (state.buffer.readUInt32BE(state.offset) !== 0) {
 			throw "Invalid frame encoding!";
 		}
-		offset += 4;
-		payload_length = buffer.readUInt32BE(offset);
-		offset += 4;
+		state.offset += 4;
+		payload_length = state.buffer.readUInt32BE(state.offset);
+		state.offset += 4;
 		if (payload_length <= 65535) {
 			throw "Invalid frame encoding!";
 		}
 	}
 	let key = Buffer.alloc(4);
 	if (masked === 1) {
-		key = buffer.slice(offset, offset + 4);
-		offset += 4;
+		key = state.buffer.slice(state.offset, state.offset + 4);
+		state.offset += 4;
 	}
-	if (offset + payload_length > buffer.length) {
+	if (state.offset + payload_length > state.buffer.length) {
 		throw "Invalid frame encoding!";
 	}
-	let payload = buffer.slice(offset, offset + payload_length);
+	let payload = state.buffer.slice(state.offset, state.offset + payload_length);
+	state.offset += payload_length;
 	if (masked === 1) {
 		for (let i = 0; i < payload.length; i++) {
 			payload[i] = payload[i] ^ key[i & 0x03];
@@ -321,9 +326,15 @@ export class WebSocketServer {
 					connection_id
 				});
 				socket.on("data", (buffer) => {
+					let state = {
+						buffer,
+						offset: 0
+					};
 					try {
-						let frame = decodeFrame(buffer);
-						this.onFrame(connection_id, socket, frame);
+						while (state.offset < buffer.length) {
+							let frame = decodeFrame(state);
+							this.onFrame(connection_id, socket, frame);
+						}
 					} catch (error) {
 						return this.closeConnection(connection_id, socket, true);
 					}

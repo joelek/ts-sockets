@@ -208,22 +208,20 @@ export class WebSocketServer {
 	private connections: BiMap<string, libnet.Socket>;
 	private router: stdlib.routing.MessageRouter<WebSocketServerMessageMap>;
 
-	private closeConnection(connection_id: string, socket: libnet.Socket, preemptive_measure: boolean): void {
-		socket.end(() => {
-			this.connections.remove(connection_id);
-			this.router.route("disconnect", {
-				connection_id,
-				preemptive_measure
-			});
-		});
+	private closeConnection(socket: libnet.Socket, preemptive_measure: boolean): void {
+		if (preemptive_measure) {
+			socket.destroy();
+		} else {
+			socket.end();
+		}
 	}
 
 	private onFrame(connection_id: string, socket: libnet.Socket, frame: WebSocketFrame): void {
 		if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
-			return this.closeConnection(connection_id, socket, true);
+			return this.closeConnection(socket, true);
 		}
 		if (frame.masked !== 1) {
-			return this.closeConnection(connection_id, socket, true);
+			return this.closeConnection(socket, true);
 		}
 		if (frame.opcode < 8) {
 			if (frame.opcode === WebSocketFrameType.CONTINUATION || frame.opcode === WebSocketFrameType.TEXT || frame.opcode == WebSocketFrameType.BINARY) {
@@ -233,7 +231,7 @@ export class WebSocketServer {
 					this.pending_chunks.set(connection_id, pending_chunks);
 				} else {
 					if (frame.opcode !== WebSocketFrameType.CONTINUATION) {
-						return this.closeConnection(connection_id, socket, true);
+						return this.closeConnection(socket, true);
 					}
 				}
 				pending_chunks.push(frame.payload);
@@ -246,21 +244,21 @@ export class WebSocketServer {
 					});
 				}
 			} else {
-				return this.closeConnection(connection_id, socket, true);
+				return this.closeConnection(socket, true);
 			}
 		} else {
 			if (frame.final !== 1) {
-				return this.closeConnection(connection_id, socket, true);
+				return this.closeConnection(socket, true);
 			}
 			if (frame.payload.length > 125) {
-				return this.closeConnection(connection_id, socket, true);
+				return this.closeConnection(socket, true);
 			}
 			if (frame.opcode === WebSocketFrameType.CLOSE) {
 				socket.write(encodeFrame({
 					...frame,
 					masked: 0
 				}), () => {
-					return this.closeConnection(connection_id, socket, false);
+					return this.closeConnection(socket, false);
 				});
 			} else if (frame.opcode === WebSocketFrameType.PING) {
 				socket.write(encodeFrame({
@@ -270,7 +268,7 @@ export class WebSocketServer {
 				}));
 			} else if (frame.opcode === WebSocketFrameType.PONG) {
 			} else {
-				return this.closeConnection(connection_id, socket, true);
+				return this.closeConnection(socket, true);
 			}
 		}
 	}
@@ -290,7 +288,7 @@ export class WebSocketServer {
 			let socket = request.socket;
 			let connection_id = this.connections.key(socket);
 			if (connection_id !== null) {
-				return this.closeConnection(connection_id, socket, true);
+				return this.closeConnection(socket, true);
 			}
 			let major = request.httpVersionMajor;
 			let minor = request.httpVersionMinor;
@@ -355,8 +353,15 @@ export class WebSocketServer {
 							this.onFrame(connection_id, socket, frame);
 						}
 					} catch (error) {
-						return this.closeConnection(connection_id, socket, true);
+						return this.closeConnection(socket, true);
 					}
+				});
+				socket.on("close", () => {
+					this.connections.remove(connection_id);
+					this.router.route("disconnect", {
+						connection_id,
+						preemptive_measure: socket.destroyed
+					});
 				});
 				socket.setTimeout(0);
 			});

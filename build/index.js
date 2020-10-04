@@ -169,21 +169,20 @@ class WebSocketServer {
         this.connections = new BiMap();
         this.router = new stdlib.routing.MessageRouter();
     }
-    closeConnection(connection_id, socket, preemptive_measure) {
-        socket.end(() => {
-            this.connections.remove(connection_id);
-            this.router.route("disconnect", {
-                connection_id,
-                preemptive_measure
-            });
-        });
+    closeConnection(socket, preemptive_measure) {
+        if (preemptive_measure) {
+            socket.destroy();
+        }
+        else {
+            socket.end();
+        }
     }
     onFrame(connection_id, socket, frame) {
         if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
-            return this.closeConnection(connection_id, socket, true);
+            return this.closeConnection(socket, true);
         }
         if (frame.masked !== 1) {
-            return this.closeConnection(connection_id, socket, true);
+            return this.closeConnection(socket, true);
         }
         if (frame.opcode < 8) {
             if (frame.opcode === WebSocketFrameType.CONTINUATION || frame.opcode === WebSocketFrameType.TEXT || frame.opcode == WebSocketFrameType.BINARY) {
@@ -194,7 +193,7 @@ class WebSocketServer {
                 }
                 else {
                     if (frame.opcode !== WebSocketFrameType.CONTINUATION) {
-                        return this.closeConnection(connection_id, socket, true);
+                        return this.closeConnection(socket, true);
                     }
                 }
                 pending_chunks.push(frame.payload);
@@ -208,19 +207,19 @@ class WebSocketServer {
                 }
             }
             else {
-                return this.closeConnection(connection_id, socket, true);
+                return this.closeConnection(socket, true);
             }
         }
         else {
             if (frame.final !== 1) {
-                return this.closeConnection(connection_id, socket, true);
+                return this.closeConnection(socket, true);
             }
             if (frame.payload.length > 125) {
-                return this.closeConnection(connection_id, socket, true);
+                return this.closeConnection(socket, true);
             }
             if (frame.opcode === WebSocketFrameType.CLOSE) {
                 socket.write(encodeFrame(Object.assign(Object.assign({}, frame), { masked: 0 })), () => {
-                    return this.closeConnection(connection_id, socket, false);
+                    return this.closeConnection(socket, false);
                 });
             }
             else if (frame.opcode === WebSocketFrameType.PING) {
@@ -229,7 +228,7 @@ class WebSocketServer {
             else if (frame.opcode === WebSocketFrameType.PONG) {
             }
             else {
-                return this.closeConnection(connection_id, socket, true);
+                return this.closeConnection(socket, true);
             }
         }
     }
@@ -241,7 +240,7 @@ class WebSocketServer {
             let socket = request.socket;
             let connection_id = this.connections.key(socket);
             if (connection_id !== null) {
-                return this.closeConnection(connection_id, socket, true);
+                return this.closeConnection(socket, true);
             }
             let major = request.httpVersionMajor;
             let minor = request.httpVersionMinor;
@@ -307,8 +306,15 @@ class WebSocketServer {
                         }
                     }
                     catch (error) {
-                        return this.closeConnection(connection_id, socket, true);
+                        return this.closeConnection(socket, true);
                     }
+                });
+                socket.on("close", () => {
+                    this.connections.remove(connection_id);
+                    this.router.route("disconnect", {
+                        connection_id,
+                        preemptive_measure: socket.destroyed
+                    });
                 });
                 socket.setTimeout(0);
             });

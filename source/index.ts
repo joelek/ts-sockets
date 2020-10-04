@@ -3,6 +3,15 @@ import * as libhttp from "http";
 import * as libnet from "net";
 import * as stdlib from "@joelek/ts-stdlib";
 
+const is = {
+	absent<A>(subject: A | null | undefined): subject is null | undefined {
+		return subject == null;
+	},
+	present<A>(subject: A | null | undefined): subject is A {
+		return subject != null;
+	}
+};
+
 class BiMap<A, B> {
 	private value_to_key: Map<B, A>;
 	private key_to_value: Map<A, B>;
@@ -23,7 +32,7 @@ class BiMap<A, B> {
 
 	remove(key: A): void {
 		let value = this.key_to_value.get(key);
-		if (value !== undefined) {
+		if (is.present(value)) {
 			this.value_to_key.delete(value);
 		}
 		this.key_to_value.delete(key);
@@ -192,7 +201,7 @@ function encodeFrame(frame: WebSocketFrame): Buffer {
 
 function getHeader(request: libhttp.IncomingMessage, key: string): string | null {
 	let values = request.headers[key.toLowerCase()];
-	if (values !== undefined) {
+	if (is.present(values)) {
 		if (values.constructor === String) {
 			return values as string;
 		}
@@ -226,7 +235,7 @@ export class WebSocketServer {
 		if (frame.opcode < 8) {
 			if (frame.opcode === WebSocketFrameType.CONTINUATION || frame.opcode === WebSocketFrameType.TEXT || frame.opcode == WebSocketFrameType.BINARY) {
 				let pending_chunks = this.pending_chunks.get(connection_id);
-				if (pending_chunks === undefined) {
+				if (is.absent(pending_chunks)) {
 					pending_chunks = new Array<Buffer>();
 					this.pending_chunks.set(connection_id, pending_chunks);
 				} else {
@@ -287,7 +296,7 @@ export class WebSocketServer {
 		return (request, response) => {
 			let socket = request.socket;
 			let connection_id = this.connections.key(socket);
-			if (connection_id !== null) {
+			if (is.present(connection_id)) {
 				return this.closeConnection(socket, true);
 			}
 			let major = request.httpVersionMajor;
@@ -302,22 +311,22 @@ export class WebSocketServer {
 				return response.end();
 			}
 			let host = getHeader(request, "Host");
-			if (host === null) {
+			if (is.absent(host)) {
 				response.writeHead(400);
 				return response.end();
 			}
 			let upgrade = getHeader(request, "Upgrade");
-			if (upgrade === null || upgrade.toLowerCase() !== "websocket") {
+			if (is.absent(upgrade) || upgrade.toLowerCase() !== "websocket") {
 				response.writeHead(400);
 				return response.end();
 			}
 			let connection = getHeader(request, "Connection");
-			if (connection === null || connection.toLowerCase() !== "upgrade") {
+			if (is.absent(connection) || connection.toLowerCase() !== "upgrade") {
 				response.writeHead(400);
 				return response.end();
 			}
 			let key = getHeader(request, "Sec-WebSocket-Key");
-			if (key === null || Buffer.from(key, "base64").length !== 16) {
+			if (is.absent(key) || Buffer.from(key, "base64").length !== 16) {
 				response.writeHead(400);
 				return response.end();
 			}
@@ -374,7 +383,7 @@ export class WebSocketServer {
 
 	send(connection_id: string, payload: string | Buffer): void {
 		let socket = this.connections.value(connection_id);
-		if (socket === null) {
+		if (is.absent(socket)) {
 			throw "Connection with id \"" + connection_id + "\" has no socket!";
 		}
 		let final = 1;

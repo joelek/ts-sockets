@@ -54,12 +54,31 @@ type WebSocketServerMessageMap = {
 	"message": WebSocketServerMessageMessage;
 };
 
+enum WebSocketFrameType {
+	CONTINUATION,
+	TEXT,
+	BINARY,
+	UNUSED_3,
+	UNUSED_4,
+	UNUSED_5,
+	UNUSED_6,
+	UNUSED_7,
+	CLOSE,
+	PING,
+	PONG,
+	UNUSED_B,
+	UNUSED_C,
+	UNUSED_D,
+	UNUSED_E,
+	UNUSED_F
+};
+
 type WebSocketFrame = {
 	final: number;
 	reserved1: number;
 	reserved2: number;
 	reserved3: number;
-	opcode: number;
+	opcode: WebSocketFrameType;
 	masked: number;
 	payload: Buffer;
 };
@@ -207,13 +226,13 @@ export class WebSocketServer {
 			return this.closeConnection(connection_id, socket, true);
 		}
 		if (frame.opcode < 8) {
-			if (frame.opcode === 0x00 || frame.opcode === 0x01 || frame.opcode == 0x02) {
+			if (frame.opcode === WebSocketFrameType.CONTINUATION || frame.opcode === WebSocketFrameType.TEXT || frame.opcode == WebSocketFrameType.BINARY) {
 				let pending_chunks = this.pending_chunks.get(connection_id);
 				if (pending_chunks === undefined) {
 					pending_chunks = new Array<Buffer>();
 					this.pending_chunks.set(connection_id, pending_chunks);
 				} else {
-					if (frame.opcode !== 0x00) {
+					if (frame.opcode !== WebSocketFrameType.CONTINUATION) {
 						return this.closeConnection(connection_id, socket, true);
 					}
 				}
@@ -236,20 +255,20 @@ export class WebSocketServer {
 			if (frame.payload.length > 125) {
 				return this.closeConnection(connection_id, socket, true);
 			}
-			if (frame.opcode === 0x08) {
+			if (frame.opcode === WebSocketFrameType.CLOSE) {
 				socket.write(encodeFrame({
 					...frame,
 					masked: 0
 				}), () => {
 					return this.closeConnection(connection_id, socket, false);
 				});
-			} else if (frame.opcode === 0x09) {
+			} else if (frame.opcode === WebSocketFrameType.PING) {
 				socket.write(encodeFrame({
 					...frame,
 					opcode: 0x0A,
 					masked: 0
 				}));
-			} else if (frame.opcode === 0x0A) {
+			} else if (frame.opcode === WebSocketFrameType.PONG) {
 			} else {
 				return this.closeConnection(connection_id, socket, true);
 			}
@@ -357,11 +376,11 @@ export class WebSocketServer {
 		let reserved1 = 0;
 		let reserved2 = 0;
 		let reserved3 = 0;
-		let opcode = 0x02;
+		let opcode = WebSocketFrameType.BINARY;
 		let masked = 0;
 		if (!(payload instanceof Buffer)) {
 			payload = Buffer.from(payload, "utf8");
-			opcode = 0x01;
+			opcode = WebSocketFrameType.TEXT;
 		}
 		let frame = encodeFrame({
 			final,

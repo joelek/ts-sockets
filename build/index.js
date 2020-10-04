@@ -26,6 +26,26 @@ class BiMap {
         return this.key_to_value.get(key) || null;
     }
 }
+var WebSocketFrameType;
+(function (WebSocketFrameType) {
+    WebSocketFrameType[WebSocketFrameType["CONTINUATION"] = 0] = "CONTINUATION";
+    WebSocketFrameType[WebSocketFrameType["TEXT"] = 1] = "TEXT";
+    WebSocketFrameType[WebSocketFrameType["BINARY"] = 2] = "BINARY";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_3"] = 3] = "UNUSED_3";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_4"] = 4] = "UNUSED_4";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_5"] = 5] = "UNUSED_5";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_6"] = 6] = "UNUSED_6";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_7"] = 7] = "UNUSED_7";
+    WebSocketFrameType[WebSocketFrameType["CLOSE"] = 8] = "CLOSE";
+    WebSocketFrameType[WebSocketFrameType["PING"] = 9] = "PING";
+    WebSocketFrameType[WebSocketFrameType["PONG"] = 10] = "PONG";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_B"] = 11] = "UNUSED_B";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_C"] = 12] = "UNUSED_C";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_D"] = 13] = "UNUSED_D";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_E"] = 14] = "UNUSED_E";
+    WebSocketFrameType[WebSocketFrameType["UNUSED_F"] = 15] = "UNUSED_F";
+})(WebSocketFrameType || (WebSocketFrameType = {}));
+;
 function decodeFrame(state) {
     let final = ((state.buffer.readUInt8(state.offset) >> 7) & 0x01);
     let reserved1 = ((state.buffer.readUInt8(state.offset) >> 6) & 0x01);
@@ -166,14 +186,14 @@ class WebSocketServer {
             return this.closeConnection(connection_id, socket, true);
         }
         if (frame.opcode < 8) {
-            if (frame.opcode === 0x00 || frame.opcode === 0x01 || frame.opcode == 0x02) {
+            if (frame.opcode === WebSocketFrameType.CONTINUATION || frame.opcode === WebSocketFrameType.TEXT || frame.opcode == WebSocketFrameType.BINARY) {
                 let pending_chunks = this.pending_chunks.get(connection_id);
                 if (pending_chunks === undefined) {
                     pending_chunks = new Array();
                     this.pending_chunks.set(connection_id, pending_chunks);
                 }
                 else {
-                    if (frame.opcode !== 0x00) {
+                    if (frame.opcode !== WebSocketFrameType.CONTINUATION) {
                         return this.closeConnection(connection_id, socket, true);
                     }
                 }
@@ -198,15 +218,15 @@ class WebSocketServer {
             if (frame.payload.length > 125) {
                 return this.closeConnection(connection_id, socket, true);
             }
-            if (frame.opcode === 0x08) {
+            if (frame.opcode === WebSocketFrameType.CLOSE) {
                 socket.write(encodeFrame(Object.assign(Object.assign({}, frame), { masked: 0 })), () => {
                     return this.closeConnection(connection_id, socket, false);
                 });
             }
-            else if (frame.opcode === 0x09) {
+            else if (frame.opcode === WebSocketFrameType.PING) {
                 socket.write(encodeFrame(Object.assign(Object.assign({}, frame), { opcode: 0x0A, masked: 0 })));
             }
-            else if (frame.opcode === 0x0A) {
+            else if (frame.opcode === WebSocketFrameType.PONG) {
             }
             else {
                 return this.closeConnection(connection_id, socket, true);
@@ -306,11 +326,11 @@ class WebSocketServer {
         let reserved1 = 0;
         let reserved2 = 0;
         let reserved3 = 0;
-        let opcode = 0x02;
+        let opcode = WebSocketFrameType.BINARY;
         let masked = 0;
         if (!(payload instanceof Buffer)) {
             payload = Buffer.from(payload, "utf8");
-            opcode = 0x01;
+            opcode = WebSocketFrameType.TEXT;
         }
         let frame = encodeFrame({
             final,

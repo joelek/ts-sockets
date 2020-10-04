@@ -320,8 +320,7 @@ class WebSocketServer {
                 socket.on("close", () => {
                     this.connections.remove(connection_id);
                     this.router.route("disconnect", {
-                        connection_id,
-                        preemptive_measure: socket.destroyed
+                        connection_id
                     });
                 });
                 socket.setTimeout(0);

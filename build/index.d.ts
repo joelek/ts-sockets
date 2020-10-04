@@ -6,7 +6,6 @@ declare type WebSocketServerConnectMessage = {
 };
 declare type WebSocketServerDisconnectMessage = {
     connection_id: string;
-    preemptive_measure: boolean;
 };
 declare type WebSocketServerMessageMessage = {
     connection_id: string;

@@ -3,12 +3,15 @@ import * as libhttp from "http";
 import * as stdlib from "@joelek/ts-stdlib";
 declare type WebSocketServerConnectMessage = {
     connection_id: string;
+    connection_url: string;
 };
 declare type WebSocketServerDisconnectMessage = {
     connection_id: string;
+    connection_url: string;
 };
 declare type WebSocketServerMessageMessage = {
     connection_id: string;
+    connection_url: string;
     buffer: Buffer;
 };
 declare type WebSocketServerMessageMap = {

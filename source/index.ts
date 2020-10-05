@@ -1,6 +1,7 @@
 import * as libcrypto from "crypto";
 import * as libhttp from "http";
 import * as libnet from "net";
+import * as libtls from "tls";
 import * as stdlib from "@joelek/ts-stdlib";
 
 const is = {
@@ -45,14 +46,17 @@ class BiMap<A, B> {
 
 type WebSocketServerConnectMessage = {
 	connection_id: string;
+	connection_url: string;
 };
 
 type WebSocketServerDisconnectMessage = {
 	connection_id: string;
+	connection_url: string;
 };
 
 type WebSocketServerMessageMessage = {
 	connection_id: string;
+	connection_url: string;
 	buffer: Buffer;
 };
 
@@ -211,6 +215,13 @@ function getHeader(request: libhttp.IncomingMessage, key: string): string | null
 	return null;
 }
 
+function makeConnectionUrl(request: libhttp.IncomingMessage): string {
+	let host = request.headers.host || "";
+	let path = request.url || "/";
+	let protocol = request.socket instanceof libtls.TLSSocket ? "wss:" : "ws:";
+	return `${protocol}//${host}${path}`;
+}
+
 export class WebSocketServer {
 	private pending_chunks: Map<string, Array<Buffer>>;
 	private connections: BiMap<string, libnet.Socket>;
@@ -224,7 +235,7 @@ export class WebSocketServer {
 		}
 	}
 
-	private onFrame(connection_id: string, socket: libnet.Socket, frame: WebSocketFrame): void {
+	private onFrame(connection_id: string, connection_url: string, socket: libnet.Socket, frame: WebSocketFrame): void {
 		if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
 			return this.closeConnection(socket, true);
 		}
@@ -248,6 +259,7 @@ export class WebSocketServer {
 					this.pending_chunks.delete(connection_id);
 					this.router.route("message", {
 						connection_id,
+						connection_url,
 						buffer
 					});
 				}
@@ -346,9 +358,11 @@ export class WebSocketServer {
 			});
 			return response.end(() => {
 				let connection_id = libcrypto.randomBytes(16).toString("hex");
+				let connection_url = makeConnectionUrl(request);
 				this.connections.add(connection_id, socket);
 				this.router.route("connect", {
-					connection_id
+					connection_id,
+					connection_url
 				});
 				socket.on("data", (buffer) => {
 					let state = {
@@ -358,7 +372,7 @@ export class WebSocketServer {
 					try {
 						while (state.offset < buffer.length) {
 							let frame = decodeFrame(state);
-							this.onFrame(connection_id, socket, frame);
+							this.onFrame(connection_id, connection_url, socket, frame);
 						}
 					} catch (error) {
 						return this.closeConnection(socket, true);
@@ -367,7 +381,8 @@ export class WebSocketServer {
 				socket.on("close", () => {
 					this.connections.remove(connection_id);
 					this.router.route("disconnect", {
-						connection_id
+						connection_id,
+						connection_url
 					});
 				});
 				socket.setTimeout(0);

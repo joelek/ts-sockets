@@ -1,34 +1,5 @@
-/// <reference types="node" />
-import * as libhttp from "http";
-import * as stdlib from "@joelek/ts-stdlib";
-declare type WebSocketServerConnectMessage = {
-    connection_id: string;
-    connection_url: string;
-};
-declare type WebSocketServerDisconnectMessage = {
-    connection_id: string;
-    connection_url: string;
-};
-declare type WebSocketServerMessageMessage = {
-    connection_id: string;
-    connection_url: string;
-    buffer: Buffer;
-};
-declare type WebSocketServerMessageMap = {
-    "connect": WebSocketServerConnectMessage;
-    "disconnect": WebSocketServerDisconnectMessage;
-    "message": WebSocketServerMessageMessage;
-};
-export declare class WebSocketServer {
-    private pending_chunks;
-    private connections;
-    private router;
-    private closeConnection;
-    private onFrame;
-    constructor();
-    addEventListener<K extends keyof WebSocketServerMessageMap>(type: K, listener: stdlib.routing.MessageObserver<WebSocketServerMessageMap[K]>): void;
-    getRequestHandler(): libhttp.RequestListener;
-    removeEventListener<K extends keyof WebSocketServerMessageMap>(type: K, listener: stdlib.routing.MessageObserver<WebSocketServerMessageMap[K]>): void;
-    send(connection_id: string, payload: string | Buffer): void;
-}
-export {};
+export * as client from "./client";
+export * as frames from "./frames";
+export * as server from "./server";
+export { WebSocketClient } from "./client";
+export { WebSocketServer } from "./server";

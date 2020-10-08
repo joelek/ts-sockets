@@ -8,7 +8,7 @@ const liburl = require("url");
 const stdlib = require("@joelek/ts-stdlib");
 const frames = require("./frames");
 const is = require("./is");
-const shared_1 = require("./shared");
+const shared = require("./shared");
 function makeHttpPromise(url, options) {
     return new Promise((resolve, reject) => {
         libhttp.get(url, options)
@@ -71,16 +71,16 @@ class WebSocketClient {
             if (response.statusCode !== 101) {
                 return socket.emit("error");
             }
-            if (((_a = shared_1.getHeader(response, "Connection")) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== "upgrade") {
+            if (((_a = shared.getHeader(response, "Connection")) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== "upgrade") {
                 return socket.emit("error");
             }
-            if (((_b = shared_1.getHeader(response, "Upgrade")) === null || _b === void 0 ? void 0 : _b.toLowerCase()) !== "websocket") {
+            if (((_b = shared.getHeader(response, "Upgrade")) === null || _b === void 0 ? void 0 : _b.toLowerCase()) !== "websocket") {
                 return socket.emit("error");
             }
             let accept = libcrypto.createHash("sha1")
                 .update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
                 .digest("base64");
-            if (shared_1.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
+            if (shared.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
                 return socket.emit("error");
             }
             this.socket = socket;

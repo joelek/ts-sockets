@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.WebSocketServer = exports.WebSocketClient = exports.server = exports.frames = exports.client = void 0;
 exports.client = require("./client");
 exports.frames = require("./frames");
 exports.server = require("./server");

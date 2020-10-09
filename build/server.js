@@ -147,19 +147,22 @@ class WebSocketServer {
                     connection_id,
                     connection_url
                 });
-                socket.on("data", (buffer) => {
-                    let state = {
-                        buffer,
-                        offset: 0
-                    };
-                    try {
-                        while (state.offset < buffer.length) {
+                let buffer = Buffer.alloc(0);
+                socket.on("data", (chunk) => {
+                    buffer = Buffer.concat([buffer, chunk]);
+                    while (true) {
+                        try {
+                            let state = {
+                                buffer,
+                                offset: 0
+                            };
                             let frame = frames.decodeFrame(state);
                             this.onFrame(connection_id, connection_url, socket, frame);
+                            buffer = buffer.slice(state.offset);
                         }
-                    }
-                    catch (error) {
-                        return this.closeConnection(socket, true);
+                        catch (error) {
+                            break;
+                        }
                     }
                 });
                 socket.on("close", () => {

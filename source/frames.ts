@@ -1,5 +1,5 @@
 import * as libcrypto from "crypto";
-import * as shared from "./shared";
+import * as utils from "./utils";
 
 export enum WebSocketFrameType {
 	CONTINUATION,
@@ -30,7 +30,7 @@ export type WebSocketFrame = {
 	payload: Buffer;
 };
 
-export function decodeFrame(state: shared.State): WebSocketFrame {
+export function decodeFrame(state: utils.State): WebSocketFrame {
 	let final = ((state.buffer.readUInt8(state.offset) >> 7) & 0x01);
 	let reserved1 = ((state.buffer.readUInt8(state.offset) >> 6) & 0x01);
 	let reserved2 = ((state.buffer.readUInt8(state.offset) >> 5) & 0x01);

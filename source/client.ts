@@ -7,6 +7,7 @@ import * as stdlib from "@joelek/ts-stdlib";
 import * as frames from "./frames";
 import * as is from "./is";
 import * as shared from "./shared";
+import * as utils from "./utils";
 
 function makeHttpPromise(url: string, options: libhttp.RequestOptions): Promise<libhttp.IncomingMessage> {
 	return new Promise((resolve, reject) => {
@@ -125,16 +126,16 @@ export class WebSocketClient {
 			if (response.statusCode !== 101) {
 				return socket.emit("error");
 			}
-			if (shared.getHeader(response, "Connection")?.toLowerCase() !== "upgrade") {
+			if (utils.getHeader(response, "Connection")?.toLowerCase() !== "upgrade") {
 				return socket.emit("error");
 			}
-			if (shared.getHeader(response, "Upgrade")?.toLowerCase() !== "websocket") {
+			if (utils.getHeader(response, "Upgrade")?.toLowerCase() !== "websocket") {
 				return socket.emit("error");
 			}
 			let accept = libcrypto.createHash("sha1")
 				.update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 				.digest("base64");
-			if (shared.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
+			if (utils.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
 				return socket.emit("error");
 			}
 			this.socket = socket;

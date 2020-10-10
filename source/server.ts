@@ -6,6 +6,7 @@ import * as stdlib from "@joelek/ts-stdlib";
 import * as frames from "./frames";
 import * as is from "./is";
 import * as shared from "./shared";
+import * as utils from "./utils";
 
 type WebSocketServerConnectMessage = {
 	connection_id: string;
@@ -38,7 +39,7 @@ function makeConnectionUrl(request: libhttp.IncomingMessage): string {
 
 export class WebSocketServer {
 	private pending_chunks: Map<string, Array<Buffer>>;
-	private connections: shared.BiMap<string, libnet.Socket>;
+	private connections: utils.BiMap<string, libnet.Socket>;
 	private router: stdlib.routing.MessageRouter<WebSocketServerMessageMap>;
 
 	private closeConnection(socket: libnet.Socket, preemptive_measure: boolean): void {
@@ -109,7 +110,7 @@ export class WebSocketServer {
 
 	constructor() {
 		this.pending_chunks = new Map<string, Array<Buffer>>();
-		this.connections = new shared.BiMap<string, libnet.Socket>();
+		this.connections = new utils.BiMap<string, libnet.Socket>();
 		this.router = new stdlib.routing.MessageRouter<WebSocketServerMessageMap>();
 	}
 
@@ -135,27 +136,27 @@ export class WebSocketServer {
 				response.writeHead(400);
 				return response.end();
 			}
-			let host = shared.getHeader(request, "Host");
+			let host = utils.getHeader(request, "Host");
 			if (is.absent(host)) {
 				response.writeHead(400);
 				return response.end();
 			}
-			let upgrade = shared.getHeader(request, "Upgrade");
+			let upgrade = utils.getHeader(request, "Upgrade");
 			if (is.absent(upgrade) || upgrade.toLowerCase() !== "websocket") {
 				response.writeHead(400);
 				return response.end();
 			}
-			let connection = shared.getHeader(request, "Connection");
+			let connection = utils.getHeader(request, "Connection");
 			if (is.absent(connection) || connection.toLowerCase() !== "upgrade") {
 				response.writeHead(400);
 				return response.end();
 			}
-			let key = shared.getHeader(request, "Sec-WebSocket-Key");
+			let key = utils.getHeader(request, "Sec-WebSocket-Key");
 			if (is.absent(key) || Buffer.from(key, "base64").length !== 16) {
 				response.writeHead(400);
 				return response.end();
 			}
-			let version = shared.getHeader(request, "Sec-WebSocket-Version");
+			let version = utils.getHeader(request, "Sec-WebSocket-Version");
 			if (version !== "13") {
 				response.writeHead(426, {
 					"Sec-WebSocket-Version": "13"

@@ -112,6 +112,14 @@ export class WebSocketServer {
 		this.router = new stdlib.routing.MessageRouter<WebSocketServerMessageMap>();
 	}
 
+	broadcast(payload: string | Buffer): void {
+		for (let [connection_id, socket] of this.connections) {
+			if (this.states.get(connection_id) === shared.ReadyState.OPEN) {
+				this.send(connection_id, payload);
+			}
+		}
+	}
+
 	addEventListener<K extends keyof WebSocketServerMessageMap>(type: K, listener: stdlib.routing.MessageObserver<WebSocketServerMessageMap[K]>): void {
 		return this.router.addObserver(type, listener);
 	}

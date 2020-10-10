@@ -74,7 +74,7 @@ export class WebSocketClient {
 			if (frame.opcode === frames.WebSocketFrameType.CLOSE) {
 				socket.write(frames.encodeFrame({
 					...frame,
-					masked: 0
+					masked: 1
 				}), () => {
 					return socket.end();
 				});
@@ -82,7 +82,7 @@ export class WebSocketClient {
 				socket.write(frames.encodeFrame({
 					...frame,
 					opcode: 0x0A,
-					masked: 0
+					masked: 1
 				}));
 			} else if (frame.opcode === frames.WebSocketFrameType.PONG) {
 			} else {

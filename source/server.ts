@@ -120,6 +120,32 @@ export class WebSocketServer {
 		return this.router.addObserver(type, listener);
 	}
 
+	close(connection_id: string, status?: shared.StatusCode): void {
+		if (this.states.get(connection_id) !== shared.ReadyState.OPEN) {
+			throw `Expected socket to be open!`;
+		}
+		const socket = this.connections.value(connection_id);
+		if (is.absent(socket)) {
+			throw "Connection with id \"" + connection_id + "\" has no socket!";
+		}
+		let payload = Buffer.alloc(0);
+		if (is.present(status)) {
+			payload = Buffer.concat([Buffer.alloc(2), Buffer.from("Connection closed by server.")]);
+			payload.writeUInt16BE(status, 0);
+		}
+		let frame = frames.encodeFrame({
+			final: 1,
+			reserved1: 0,
+			reserved2: 0,
+			reserved3: 0,
+			opcode: frames.WebSocketFrameType.CLOSE,
+			masked: 0,
+			payload: payload
+		});
+		socket.write(frame);
+		this.states.set(connection_id, shared.ReadyState.CLOSING);
+	}
+
 	getRequestHandler(): libhttp.RequestListener {
 		return (request, response) => {
 			let socket = request.socket;

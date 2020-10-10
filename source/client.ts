@@ -173,6 +173,32 @@ export class WebSocketClient {
 		this.listeners.addObserver(type, listener);
 	}
 
+	close(status?: shared.StatusCode): void {
+		if (this.state !== shared.ReadyState.OPEN) {
+			throw `Expected socket to be open!`;
+		}
+		const socket = this.socket;
+		if (is.absent(socket)) {
+			throw `Expected socket to be open!`;
+		}
+		let payload = Buffer.alloc(0);
+		if (is.present(status)) {
+			payload = Buffer.concat([Buffer.alloc(2), Buffer.from("Connection closed by client.")]);
+			payload.writeUInt16BE(status, 0);
+		}
+		let frame = frames.encodeFrame({
+			final: 1,
+			reserved1: 0,
+			reserved2: 0,
+			reserved3: 0,
+			opcode: frames.WebSocketFrameType.CLOSE,
+			masked: 1,
+			payload: payload
+		});
+		socket.write(frame);
+		this.state = shared.ReadyState.CLOSING;
+	}
+
 	removeEventListener<A extends keyof WebSocketEventMap>(type: A, listener: (event: WebSocketEventMap[A]) => void): void {
 		this.listeners.removeObserver(type, listener);
 	}

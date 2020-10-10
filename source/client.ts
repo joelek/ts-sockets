@@ -35,15 +35,8 @@ function makeHttpsPromise(url: string, options: libhttps.RequestOptions): Promis
 	});
 }
 
-export enum ReadyState {
-	CONNECTING,
-	OPEN,
-	CLOSING,
-	CLOSED
-};
-
 export class WebSocketClient {
-	private state: ReadyState;
+	private state: shared.ReadyState;
 	private listeners: stdlib.routing.MessageRouter<WebSocketEventMap>;
 	private pending: Array<Buffer>;
 	private socket: libnet.Socket | undefined;
@@ -102,7 +95,7 @@ export class WebSocketClient {
 	}
 
 	constructor(url: string) {
-		this.state = ReadyState.CONNECTING;
+		this.state = shared.ReadyState.CONNECTING;
 		this.listeners = new stdlib.routing.MessageRouter<WebSocketEventMap>();
 		this.pending = new Array<Buffer>();
 		this.socket = undefined;
@@ -127,11 +120,11 @@ export class WebSocketClient {
 			let socket = upgraded.socket;
 			let buffer = upgraded.buffer;
 			socket.on("close", () => {
-				this.state = ReadyState.CLOSED;
+				this.state = shared.ReadyState.CLOSED;
 				this.listeners.route("close", undefined as any);
 			});
 			socket.on("error", () => {
-				this.state = ReadyState.CLOSING;
+				this.state = shared.ReadyState.CLOSING;
 				this.listeners.route("error", undefined as any);
 				socket.end();
 			});
@@ -185,7 +178,7 @@ export class WebSocketClient {
 	}
 
 	send(payload: string | Buffer): void {
-		if (this.state !== ReadyState.OPEN) {
+		if (this.state !== shared.ReadyState.OPEN) {
 			throw `Expected socket to be open!`;
 		}
 		let socket = this.socket;
@@ -214,7 +207,7 @@ export class WebSocketClient {
 		socket.write(frame);
 	}
 
-	get readyState(): ReadyState {
+	get readyState(): shared.ReadyState {
 		return this.state;
 	}
 };

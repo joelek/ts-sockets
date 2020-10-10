@@ -175,11 +175,6 @@ export class WebSocketServer {
 			return response.end(() => {
 				let connection_id = libcrypto.randomBytes(16).toString("hex");
 				let connection_url = makeConnectionUrl(request);
-				this.connections.add(connection_id, socket);
-				this.router.route("connect", {
-					connection_id,
-					connection_url
-				});
 				let buffer = Buffer.alloc(0);
 				socket.on("data", (chunk) => {
 					buffer = Buffer.concat([buffer, chunk]);
@@ -205,6 +200,11 @@ export class WebSocketServer {
 					});
 				});
 				socket.setTimeout(0);
+				this.connections.add(connection_id, socket);
+				this.router.route("connect", {
+					connection_id,
+					connection_url
+				});
 			});
 		};
 	}

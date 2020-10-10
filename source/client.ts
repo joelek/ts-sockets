@@ -9,18 +9,28 @@ import * as is from "./is";
 import * as shared from "./shared";
 import * as utils from "./utils";
 
-function makeHttpPromise(url: string, options: libhttp.RequestOptions): Promise<libhttp.IncomingMessage> {
+type UpgradedRequest = {
+	response: libhttp.IncomingMessage,
+	socket: libnet.Socket,
+	buffer: Buffer
+};
+
+function makeHttpPromise(url: string, options: libhttp.RequestOptions): Promise<UpgradedRequest> {
 	return new Promise((resolve, reject) => {
 		libhttp.get(url, options)
-			.on("upgrade", resolve)
+			.on("upgrade", (response, socket, buffer) => {
+				resolve({ response, socket, buffer });
+			})
 			.on("error", reject);
 	});
 }
 
-function makeHttpsPromise(url: string, options: libhttps.RequestOptions): Promise<libhttp.IncomingMessage> {
+function makeHttpsPromise(url: string, options: libhttps.RequestOptions): Promise<UpgradedRequest> {
 	return new Promise((resolve, reject) => {
 		libhttps.get(url, options)
-			.on("upgrade", resolve)
+			.on("upgrade", (response, socket, buffer) => {
+				resolve({ response, socket, buffer });
+			})
 			.on("error", reject);
 	});
 }
@@ -112,8 +122,10 @@ export class WebSocketClient {
 			} else {
 				throw `Expected ${url} to be a WebSocket URL!`;
 			}
-		})().then((response) => {
-			let socket = response.socket;
+		})().then((upgraded) => {
+			let response = upgraded.response;
+			let socket = upgraded.socket;
+			let buffer = upgraded.buffer;
 			socket.on("close", () => {
 				this.state = ReadyState.CLOSED;
 				this.listeners.route("close", undefined as any);
@@ -139,22 +151,28 @@ export class WebSocketClient {
 				return socket.emit("error");
 			}
 			this.socket = socket;
-			this.state = ReadyState.OPEN;
-			this.socket.on("data", (buffer) => {
-				let state = {
-					buffer,
-					offset: 0
-				};
-				try {
-					while (state.offset < buffer.length) {
+			let processBuffer = () => {
+				while (true) {
+					try {
+						let state = {
+							buffer,
+							offset: 0
+						};
 						let frame = frames.decodeFrame(state);
 						this.onFrame(socket, frame);
+						buffer = buffer.slice(state.offset);
+					} catch (error) {
+						break;
 					}
-				} catch (error) {
-					return socket.emit("error");
 				}
+			};
+			this.socket.on("data", (chunk) => {
+				buffer = Buffer.concat([buffer, chunk]);
+				processBuffer();
 			});
+			this.state = shared.ReadyState.OPEN;
 			this.listeners.route("open", undefined as any);
+			processBuffer();
 		});
 	}
 

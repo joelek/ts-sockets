@@ -123,7 +123,8 @@ export class WebSocketServer {
 			let socket = request.socket;
 			let connection_id = this.connections.key(socket);
 			if (is.present(connection_id)) {
-				return this.closeConnection(socket, true);
+				response.writeHead(400);
+				return response.end();
 			}
 			let major = request.httpVersionMajor;
 			let minor = request.httpVersionMinor;

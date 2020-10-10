@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import * as shared from "./shared";
+import * as utils from "./utils";
 export declare enum WebSocketFrameType {
     CONTINUATION = 0,
     TEXT = 1,
@@ -27,5 +27,5 @@ export declare type WebSocketFrame = {
     masked: number;
     payload: Buffer;
 };
-export declare function decodeFrame(state: shared.State): WebSocketFrame;
+export declare function decodeFrame(state: utils.State): WebSocketFrame;
 export declare function encodeFrame(frame: WebSocketFrame): Buffer;

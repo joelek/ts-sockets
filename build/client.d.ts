@@ -1,10 +1,5 @@
 /// <reference types="node" />
-export declare enum ReadyState {
-    CONNECTING = 0,
-    OPEN = 1,
-    CLOSING = 2,
-    CLOSED = 3
-}
+import * as shared from "./shared";
 export declare class WebSocketClient {
     private state;
     private listeners;
@@ -13,7 +8,8 @@ export declare class WebSocketClient {
     private onFrame;
     constructor(url: string);
     addEventListener<A extends keyof WebSocketEventMap>(type: A, listener: (event: WebSocketEventMap[A]) => void): void;
+    close(status?: shared.StatusCode): void;
     removeEventListener<A extends keyof WebSocketEventMap>(type: A, listener: (event: WebSocketEventMap[A]) => void): void;
     send(payload: string | Buffer): void;
-    get readyState(): ReadyState;
+    get readyState(): shared.ReadyState;
 }

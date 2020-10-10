@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WebSocketClient = exports.ReadyState = void 0;
+exports.WebSocketClient = void 0;
 const libcrypto = require("crypto");
 const libhttp = require("http");
 const libhttps = require("https");
@@ -9,32 +9,29 @@ const stdlib = require("@joelek/ts-stdlib");
 const frames = require("./frames");
 const is = require("./is");
 const shared = require("./shared");
+const utils = require("./utils");
 function makeHttpPromise(url, options) {
     return new Promise((resolve, reject) => {
         libhttp.get(url, options)
-            .on("upgrade", resolve)
+            .on("upgrade", (response, socket, buffer) => {
+            resolve({ response, socket, buffer });
+        })
             .on("error", reject);
     });
 }
 function makeHttpsPromise(url, options) {
     return new Promise((resolve, reject) => {
         libhttps.get(url, options)
-            .on("upgrade", resolve)
+            .on("upgrade", (response, socket, buffer) => {
+            resolve({ response, socket, buffer });
+        })
             .on("error", reject);
     });
 }
-var ReadyState;
-(function (ReadyState) {
-    ReadyState[ReadyState["CONNECTING"] = 0] = "CONNECTING";
-    ReadyState[ReadyState["OPEN"] = 1] = "OPEN";
-    ReadyState[ReadyState["CLOSING"] = 2] = "CLOSING";
-    ReadyState[ReadyState["CLOSED"] = 3] = "CLOSED";
-})(ReadyState = exports.ReadyState || (exports.ReadyState = {}));
-;
 class WebSocketClient {
     constructor(url) {
         var _a;
-        this.state = ReadyState.CONNECTING;
+        this.state = shared.ReadyState.CONNECTING;
         this.listeners = new stdlib.routing.MessageRouter();
         this.pending = new Array();
         this.socket = undefined;
@@ -56,67 +53,75 @@ class WebSocketClient {
             else {
                 throw `Expected ${url} to be a WebSocket URL!`;
             }
-        })().then((response) => {
+        })().then((upgraded) => {
             var _a, _b;
-            let socket = response.socket;
+            let response = upgraded.response;
+            let socket = upgraded.socket;
+            let buffer = upgraded.buffer;
             socket.on("close", () => {
-                this.state = ReadyState.CLOSED;
+                this.state = shared.ReadyState.CLOSED;
                 this.listeners.route("close", undefined);
             });
             socket.on("error", () => {
-                this.state = ReadyState.CLOSING;
+                this.state = shared.ReadyState.CLOSING;
                 this.listeners.route("error", undefined);
                 socket.end();
             });
             if (response.statusCode !== 101) {
                 return socket.emit("error");
             }
-            if (((_a = shared.getHeader(response, "Connection")) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== "upgrade") {
+            if (((_a = utils.getHeader(response, "Connection")) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== "upgrade") {
                 return socket.emit("error");
             }
-            if (((_b = shared.getHeader(response, "Upgrade")) === null || _b === void 0 ? void 0 : _b.toLowerCase()) !== "websocket") {
+            if (((_b = utils.getHeader(response, "Upgrade")) === null || _b === void 0 ? void 0 : _b.toLowerCase()) !== "websocket") {
                 return socket.emit("error");
             }
             let accept = libcrypto.createHash("sha1")
                 .update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
                 .digest("base64");
-            if (shared.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
+            if (utils.getHeader(response, "Sec-WebSocket-Accept") !== accept) {
                 return socket.emit("error");
             }
             this.socket = socket;
-            this.state = ReadyState.OPEN;
-            this.socket.on("data", (buffer) => {
-                let state = {
-                    buffer,
-                    offset: 0
-                };
-                try {
-                    while (state.offset < buffer.length) {
+            let processBuffer = () => {
+                while (true) {
+                    try {
+                        let state = {
+                            buffer,
+                            offset: 0
+                        };
                         let frame = frames.decodeFrame(state);
                         this.onFrame(socket, frame);
+                        buffer = buffer.slice(state.offset);
+                    }
+                    catch (error) {
+                        break;
                     }
                 }
-                catch (error) {
-                    return socket.emit("error");
-                }
+            };
+            this.socket.on("data", (chunk) => {
+                buffer = Buffer.concat([buffer, chunk]);
+                processBuffer();
             });
+            this.state = shared.ReadyState.OPEN;
             this.listeners.route("open", undefined);
+            processBuffer();
         });
     }
     onFrame(socket, frame) {
         if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
-            return socket.emit("error");
+            return this.close(shared.StatusCode.PROTOCOL_ERROR);
         }
         if (frame.opcode < 8) {
             if (frame.opcode === frames.WebSocketFrameType.CONTINUATION || frame.opcode === frames.WebSocketFrameType.TEXT || frame.opcode == frames.WebSocketFrameType.BINARY) {
                 if (this.pending.length === 0) {
                     if (frame.opcode === frames.WebSocketFrameType.CONTINUATION) {
-                        return socket.emit("error");
+                        return this.close(shared.StatusCode.PROTOCOL_ERROR);
                     }
                 }
                 else {
                     if (frame.opcode !== frames.WebSocketFrameType.CONTINUATION) {
-                        return socket.emit("error");
+                        return this.close(shared.StatusCode.PROTOCOL_ERROR);
                     }
                 }
                 this.pending.push(frame.payload);
@@ -129,39 +134,69 @@ class WebSocketClient {
                 }
             }
             else {
-                return socket.emit("error");
+                return this.close(shared.StatusCode.PROTOCOL_ERROR);
             }
         }
         else {
             if (frame.final !== 1) {
-                return socket.emit("error");
+                return this.close(shared.StatusCode.PROTOCOL_ERROR);
             }
             if (frame.payload.length > 125) {
-                return socket.emit("error");
+                return this.close(shared.StatusCode.PROTOCOL_ERROR);
             }
             if (frame.opcode === frames.WebSocketFrameType.CLOSE) {
-                socket.write(frames.encodeFrame(Object.assign(Object.assign({}, frame), { masked: 0 })), () => {
+                if (this.readyState === shared.ReadyState.CLOSING) {
                     return socket.end();
-                });
+                }
+                else {
+                    socket.write(frames.encodeFrame(Object.assign(Object.assign({}, frame), { masked: 1 })), () => {
+                        return socket.end();
+                    });
+                }
             }
             else if (frame.opcode === frames.WebSocketFrameType.PING) {
-                socket.write(frames.encodeFrame(Object.assign(Object.assign({}, frame), { opcode: 0x0A, masked: 0 })));
+                socket.write(frames.encodeFrame(Object.assign(Object.assign({}, frame), { opcode: 0x0A, masked: 1 })));
             }
             else if (frame.opcode === frames.WebSocketFrameType.PONG) {
             }
             else {
-                return socket.emit("error");
+                return this.close(shared.StatusCode.PROTOCOL_ERROR);
             }
         }
     }
     addEventListener(type, listener) {
         this.listeners.addObserver(type, listener);
     }
+    close(status) {
+        if (this.state !== shared.ReadyState.OPEN) {
+            throw `Expected socket to be open!`;
+        }
+        const socket = this.socket;
+        if (is.absent(socket)) {
+            throw `Expected socket to be open!`;
+        }
+        let payload = Buffer.alloc(0);
+        if (is.present(status)) {
+            payload = Buffer.concat([Buffer.alloc(2), Buffer.from("Connection closed by client.")]);
+            payload.writeUInt16BE(status, 0);
+        }
+        let frame = frames.encodeFrame({
+            final: 1,
+            reserved1: 0,
+            reserved2: 0,
+            reserved3: 0,
+            opcode: frames.WebSocketFrameType.CLOSE,
+            masked: 1,
+            payload: payload
+        });
+        socket.write(frame);
+        this.state = shared.ReadyState.CLOSING;
+    }
     removeEventListener(type, listener) {
         this.listeners.removeObserver(type, listener);
     }
     send(payload) {
-        if (this.state !== ReadyState.OPEN) {
+        if (this.state !== shared.ReadyState.OPEN) {
             throw `Expected socket to be open!`;
         }
         let socket = this.socket;

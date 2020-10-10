@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WebSocketServer = exports.WebSocketClient = exports.server = exports.frames = exports.client = void 0;
 exports.client = require("./client");
 exports.frames = require("./frames");
 exports.server = require("./server");
+exports.shared = require("./shared");
 var client_1 = require("./client");
 Object.defineProperty(exports, "WebSocketClient", { enumerable: true, get: function () { return client_1.WebSocketClient; } });
 var server_1 = require("./server");

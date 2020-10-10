@@ -39,6 +39,7 @@ function makeConnectionUrl(request: libhttp.IncomingMessage): string {
 
 export class WebSocketServer {
 	private pending_chunks: Map<string, Array<Buffer>>;
+	private states: Map<string, shared.ReadyState>;
 	private connections: utils.BiMap<string, libnet.Socket>;
 	private router: stdlib.routing.MessageRouter<WebSocketServerMessageMap>;
 
@@ -110,6 +111,7 @@ export class WebSocketServer {
 
 	constructor() {
 		this.pending_chunks = new Map<string, Array<Buffer>>();
+		this.states = new Map<string, shared.ReadyState>();
 		this.connections = new utils.BiMap<string, libnet.Socket>();
 		this.router = new stdlib.routing.MessageRouter<WebSocketServerMessageMap>();
 	}
@@ -194,6 +196,7 @@ export class WebSocketServer {
 				});
 				socket.on("close", () => {
 					this.connections.remove(connection_id);
+					this.states.delete(connection_id);
 					this.router.route("disconnect", {
 						connection_id,
 						connection_url
@@ -201,6 +204,7 @@ export class WebSocketServer {
 				});
 				socket.setTimeout(0);
 				this.connections.add(connection_id, socket);
+				this.states.set(connection_id, shared.ReadyState.OPEN);
 				this.router.route("connect", {
 					connection_id,
 					connection_url
@@ -214,6 +218,9 @@ export class WebSocketServer {
 	}
 
 	send(connection_id: string, payload: string | Buffer): void {
+		if (this.states.get(connection_id) !== shared.ReadyState.OPEN) {
+			throw `Expected socket to be open!`;
+		}
 		let socket = this.connections.value(connection_id);
 		if (is.absent(socket)) {
 			throw "Connection with id \"" + connection_id + "\" has no socket!";

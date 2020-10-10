@@ -43,17 +43,17 @@ export class WebSocketClient {
 
 	private onFrame(socket: libnet.Socket, frame: frames.WebSocketFrame): any {
 		if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
-			return socket.emit("error");
+			return this.close(shared.StatusCode.PROTOCOL_ERROR);
 		}
 		if (frame.opcode < 8) {
 			if (frame.opcode === frames.WebSocketFrameType.CONTINUATION || frame.opcode === frames.WebSocketFrameType.TEXT || frame.opcode == frames.WebSocketFrameType.BINARY) {
 				if (this.pending.length === 0) {
 					if (frame.opcode === frames.WebSocketFrameType.CONTINUATION) {
-						return socket.emit("error");
+						return this.close(shared.StatusCode.PROTOCOL_ERROR);
 					}
 				} else  {
 					if (frame.opcode !== frames.WebSocketFrameType.CONTINUATION) {
-						return socket.emit("error");
+						return this.close(shared.StatusCode.PROTOCOL_ERROR);
 					}
 				}
 				this.pending.push(frame.payload);
@@ -65,22 +65,26 @@ export class WebSocketClient {
 					} as any);
 				}
 			} else {
-				return socket.emit("error");
+				return this.close(shared.StatusCode.PROTOCOL_ERROR);
 			}
 		} else {
 			if (frame.final !== 1) {
-				return socket.emit("error");
+				return this.close(shared.StatusCode.PROTOCOL_ERROR);
 			}
 			if (frame.payload.length > 125) {
-				return socket.emit("error");
+				return this.close(shared.StatusCode.PROTOCOL_ERROR);
 			}
 			if (frame.opcode === frames.WebSocketFrameType.CLOSE) {
-				socket.write(frames.encodeFrame({
-					...frame,
-					masked: 1
-				}), () => {
+				if (this.readyState === shared.ReadyState.CLOSING) {
 					return socket.end();
-				});
+				} else {
+					socket.write(frames.encodeFrame({
+						...frame,
+						masked: 1
+					}), () => {
+						return socket.end();
+					});
+				}
 			} else if (frame.opcode === frames.WebSocketFrameType.PING) {
 				socket.write(frames.encodeFrame({
 					...frame,
@@ -89,7 +93,7 @@ export class WebSocketClient {
 				}));
 			} else if (frame.opcode === frames.WebSocketFrameType.PONG) {
 			} else {
-				return socket.emit("error");
+				return this.close(shared.StatusCode.PROTOCOL_ERROR);
 			}
 		}
 	}

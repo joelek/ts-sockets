@@ -43,20 +43,12 @@ export class WebSocketServer {
 	private connections: utils.BiMap<string, libnet.Socket>;
 	private router: stdlib.routing.MessageRouter<WebSocketServerMessageMap>;
 
-	private closeConnection(socket: libnet.Socket, preemptive_measure: boolean): void {
-		if (preemptive_measure) {
-			socket.destroy();
-		} else {
-			socket.end();
-		}
-	}
-
 	private onFrame(connection_id: string, connection_url: string, socket: libnet.Socket, frame: frames.WebSocketFrame): void {
 		if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
-			return this.closeConnection(socket, true);
+			return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 		}
 		if (frame.masked !== 1) {
-			return this.closeConnection(socket, true);
+			return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 		}
 		if (frame.opcode < 8) {
 			if (frame.opcode === frames.WebSocketFrameType.CONTINUATION || frame.opcode === frames.WebSocketFrameType.TEXT || frame.opcode == frames.WebSocketFrameType.BINARY) {
@@ -66,7 +58,7 @@ export class WebSocketServer {
 					this.pending_chunks.set(connection_id, pending_chunks);
 				} else {
 					if (frame.opcode !== frames.WebSocketFrameType.CONTINUATION) {
-						return this.closeConnection(socket, true);
+						return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 					}
 				}
 				pending_chunks.push(frame.payload);
@@ -80,22 +72,26 @@ export class WebSocketServer {
 					});
 				}
 			} else {
-				return this.closeConnection(socket, true);
+				return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 			}
 		} else {
 			if (frame.final !== 1) {
-				return this.closeConnection(socket, true);
+				return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 			}
 			if (frame.payload.length > 125) {
-				return this.closeConnection(socket, true);
+				return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 			}
 			if (frame.opcode === frames.WebSocketFrameType.CLOSE) {
-				socket.write(frames.encodeFrame({
-					...frame,
-					masked: 0
-				}), () => {
-					return this.closeConnection(socket, false);
-				});
+				if (this.states.get(connection_id) === shared.ReadyState.CLOSING) {
+					return socket.end();
+				} else {
+					socket.write(frames.encodeFrame({
+						...frame,
+						masked: 0
+					}), () => {
+						return socket.end();
+					});
+				}
 			} else if (frame.opcode === frames.WebSocketFrameType.PING) {
 				socket.write(frames.encodeFrame({
 					...frame,
@@ -104,7 +100,7 @@ export class WebSocketServer {
 				}));
 			} else if (frame.opcode === frames.WebSocketFrameType.PONG) {
 			} else {
-				return this.closeConnection(socket, true);
+				return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
 			}
 		}
 	}

@@ -18,7 +18,8 @@
 		"build": "rm -rf ./build/ && npx tsc --build",
 		"clean": "rm -rf ./build/ ./node_modules/",
 		"preversion": "npm run build && git add ./",
-		"postversion": "git push && git push --tags"
+		"postversion": "git push && git push --tags",
+		"test": "ts-node ./test/"
 	},
 	"version": "2.2.0"
 }

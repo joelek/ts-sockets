@@ -1,6 +1,6 @@
 # @joelek/ts-sockets
 
-WebSocket client and server written completely in TypeScript.
+WebSocket client and server for NodeJS written completely in TypeScript.
 
 ## Features
 

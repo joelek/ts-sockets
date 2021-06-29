@@ -82,15 +82,15 @@ class WebSocketServer {
             }
         }
     }
+    addEventListener(type, listener) {
+        return this.router.addObserver(type, listener);
+    }
     broadcast(payload) {
         for (let [connection_id, socket] of this.connections) {
             if (this.states.get(connection_id) === shared.ReadyState.OPEN) {
                 this.send(connection_id, payload);
             }
         }
-    }
-    addEventListener(type, listener) {
-        return this.router.addObserver(type, listener);
     }
     close(connection_id, status) {
         if (this.states.get(connection_id) !== shared.ReadyState.OPEN) {

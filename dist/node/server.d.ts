@@ -27,8 +27,8 @@ export declare class WebSocketServer {
     private router;
     private onFrame;
     constructor();
-    broadcast(payload: string | Buffer): void;
     addEventListener<K extends keyof WebSocketServerMessageMap>(type: K, listener: stdlib.routing.MessageObserver<WebSocketServerMessageMap[K]>): void;
+    broadcast(payload: string | Buffer): void;
     close(connection_id: string, status?: shared.StatusCode): void;
     getRequestHandler(): libhttp.RequestListener;
     removeEventListener<K extends keyof WebSocketServerMessageMap>(type: K, listener: stdlib.routing.MessageObserver<WebSocketServerMessageMap[K]>): void;

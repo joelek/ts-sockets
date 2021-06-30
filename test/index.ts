@@ -1,5 +1,5 @@
 import * as libhttp from "http";
-import * as sockets from "../source/node";
+import * as sockets from "../source/lib";
 
 let server = new sockets.WebSocketServer();
 

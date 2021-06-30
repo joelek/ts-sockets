@@ -35,9 +35,9 @@ function makeHttpsPromise(url: string, options: libhttps.RequestOptions): Promis
 	});
 }
 
-export class WebSocketClient {
+export class WebSocketClient implements shared.WebSocketLike {
 	private state: shared.ReadyState;
-	private listeners: stdlib.routing.MessageRouter<WebSocketEventMap>;
+	private listeners: stdlib.routing.MessageRouter<shared.WebSocketEventMapLike>;
 	private pending: Array<Buffer>;
 	private socket: libnet.Socket | undefined;
 
@@ -100,7 +100,7 @@ export class WebSocketClient {
 
 	constructor(url: string) {
 		this.state = shared.ReadyState.CONNECTING;
-		this.listeners = new stdlib.routing.MessageRouter<WebSocketEventMap>();
+		this.listeners = new stdlib.routing.MessageRouter<shared.WebSocketEventMapLike>();
 		this.pending = new Array<Buffer>();
 		this.socket = undefined;
 		let key = libcrypto.randomBytes(16).toString("base64");
@@ -173,7 +173,7 @@ export class WebSocketClient {
 		});
 	}
 
-	addEventListener<A extends keyof WebSocketEventMap>(type: A, listener: (event: WebSocketEventMap[A]) => void): void {
+	addEventListener<A extends keyof shared.WebSocketEventMapLike>(type: A, listener: (event: shared.WebSocketEventMapLike[A]) => void): void {
 		this.listeners.addObserver(type, listener);
 	}
 
@@ -203,7 +203,7 @@ export class WebSocketClient {
 		this.state = shared.ReadyState.CLOSING;
 	}
 
-	removeEventListener<A extends keyof WebSocketEventMap>(type: A, listener: (event: WebSocketEventMap[A]) => void): void {
+	removeEventListener<A extends keyof shared.WebSocketEventMapLike>(type: A, listener: (event: shared.WebSocketEventMapLike[A]) => void): void {
 		this.listeners.removeObserver(type, listener);
 	}
 

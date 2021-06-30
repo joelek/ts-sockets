@@ -20,3 +20,20 @@ export enum StatusCode {
 	SERVER_UNEXPECTED_CONDITION = 1011,
 	RESERVED_1015 = 1015
 };
+
+export type WebSocketEventMapLike = {
+	"close": {};
+	"error": {};
+	"message": {
+		data: string | Buffer;
+	};
+	"open": {};
+};
+
+export interface WebSocketLike {
+	addEventListener<A extends keyof WebSocketEventMapLike>(type: A, listener: (event: WebSocketEventMapLike[A]) => void): void;
+	close(status?: StatusCode): void;
+	removeEventListener<A extends keyof WebSocketEventMapLike>(type: A, listener: (event: WebSocketEventMapLike[A]) => void): void;
+	send(payload: string | Buffer): void;
+	readonly readyState: ReadyState;
+};

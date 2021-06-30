@@ -62,7 +62,7 @@ export class WebSocketClient implements shared.WebSocketLike {
 					this.pending.splice(0);
 					this.listeners.route("message", {
 						data: buffer.toString()
-					} as any);
+					});
 				}
 			} else {
 				return this.close(shared.StatusCode.PROTOCOL_ERROR);
@@ -125,11 +125,11 @@ export class WebSocketClient implements shared.WebSocketLike {
 			let buffer = upgraded.buffer;
 			socket.on("close", () => {
 				this.state = shared.ReadyState.CLOSED;
-				this.listeners.route("close", undefined as any);
+				this.listeners.route("close", {});
 			});
 			socket.on("error", () => {
 				this.state = shared.ReadyState.CLOSING;
-				this.listeners.route("error", undefined as any);
+				this.listeners.route("error", {});
 				socket.end();
 			});
 			if (response.statusCode !== 101) {
@@ -168,7 +168,7 @@ export class WebSocketClient implements shared.WebSocketLike {
 				processBuffer();
 			});
 			this.state = shared.ReadyState.OPEN;
-			this.listeners.route("open", undefined as any);
+			this.listeners.route("open", {});
 			processBuffer();
 		});
 	}

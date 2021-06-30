@@ -60,11 +60,11 @@ class WebSocketClient {
             let buffer = upgraded.buffer;
             socket.on("close", () => {
                 this.state = shared.ReadyState.CLOSED;
-                this.listeners.route("close", undefined);
+                this.listeners.route("close", {});
             });
             socket.on("error", () => {
                 this.state = shared.ReadyState.CLOSING;
-                this.listeners.route("error", undefined);
+                this.listeners.route("error", {});
                 socket.end();
             });
             if (response.statusCode !== 101) {
@@ -104,7 +104,7 @@ class WebSocketClient {
                 processBuffer();
             });
             this.state = shared.ReadyState.OPEN;
-            this.listeners.route("open", undefined);
+            this.listeners.route("open", {});
             processBuffer();
         });
     }

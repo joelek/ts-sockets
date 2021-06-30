@@ -8,7 +8,7 @@
 		"typescript": "^4"
 	},
 	"license": "MIT",
-	"main": "./dist/node/",
+	"main": "./dist/lib/index.js",
 	"name": "@joelek/ts-sockets",
 	"repository": {
 		"type": "git",

@@ -4,8 +4,8 @@
 		"@joelek/ts-stdlib": "github:joelek/ts-stdlib#semver:^1"
 	},
 	"devDependencies": {
-		"@types/node": "^14",
-		"typescript": "^4"
+		"@types/node": "^14.17.5",
+		"typescript": "^4.3.5"
 	},
 	"license": "MIT",
 	"main": "./dist/lib/index.js",

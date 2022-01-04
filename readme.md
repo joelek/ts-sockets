@@ -111,3 +111,5 @@ npm install joelek/ts-sockets#master
 ```
 
 NB: This project targets TypeScript 4 in strict mode.
+
+## Roadmap

@@ -83,7 +83,8 @@ export class WebSocketServer {
 			}
 			if (frame.opcode === frames.WebSocketFrameType.CLOSE) {
 				if (this.states.get(connection_id) === shared.ReadyState.CLOSING) {
-					return socket.end();
+					socket.end();
+					return;
 				} else {
 					socket.write(frames.encodeFrame({
 						...frame,

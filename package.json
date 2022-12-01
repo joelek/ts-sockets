@@ -24,5 +24,5 @@
 		"postversion": "git push && git push --tags",
 		"test": "ts-node ./test/"
 	},
-	"version": "2.2.8"
+	"version": "2.2.9"
 }

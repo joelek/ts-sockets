@@ -15,12 +15,6 @@ function makeConnectionUrl(request) {
     return `${protocol}//${host}${path}`;
 }
 class WebSocketServer {
-    constructor() {
-        this.pending_chunks = new Map();
-        this.states = new Map();
-        this.connections = new utils.BiMap();
-        this.router = new stdlib.routing.MessageRouter();
-    }
     onFrame(connection_id, connection_url, socket, frame) {
         if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
             return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
@@ -82,6 +76,12 @@ class WebSocketServer {
                 return this.close(connection_id, shared.StatusCode.PROTOCOL_ERROR);
             }
         }
+    }
+    constructor() {
+        this.pending_chunks = new Map();
+        this.states = new Map();
+        this.connections = new utils.BiMap();
+        this.router = new stdlib.routing.MessageRouter();
     }
     addEventListener(type, listener) {
         return this.router.addObserver(type, listener);

@@ -20,7 +20,7 @@ export declare enum StatusCode {
     SERVER_UNEXPECTED_CONDITION = 1011,
     RESERVED_1015 = 1015
 }
-export declare type WebSocketEventMapLike = {
+export type WebSocketEventMapLike = {
     "close": {};
     "error": {};
     "message": {

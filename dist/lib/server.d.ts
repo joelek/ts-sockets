@@ -3,20 +3,20 @@
 import * as libhttp from "http";
 import * as stdlib from "@joelek/ts-stdlib";
 import * as shared from "./shared";
-declare type WebSocketServerConnectMessage = {
+type WebSocketServerConnectMessage = {
     connection_id: string;
     connection_url: string;
 };
-declare type WebSocketServerDisconnectMessage = {
+type WebSocketServerDisconnectMessage = {
     connection_id: string;
     connection_url: string;
 };
-declare type WebSocketServerMessageMessage = {
+type WebSocketServerMessageMessage = {
     connection_id: string;
     connection_url: string;
     buffer: Buffer;
 };
-declare type WebSocketServerMessageMap = {
+type WebSocketServerMessageMap = {
     "connect": WebSocketServerConnectMessage;
     "disconnect": WebSocketServerDisconnectMessage;
     "message": WebSocketServerMessageMessage;

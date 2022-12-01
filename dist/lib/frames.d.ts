@@ -18,7 +18,7 @@ export declare enum WebSocketFrameType {
     UNUSED_E = 14,
     UNUSED_F = 15
 }
-export declare type WebSocketFrame = {
+export type WebSocketFrame = {
     final: number;
     reserved1: number;
     reserved2: number;

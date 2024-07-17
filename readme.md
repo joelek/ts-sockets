@@ -43,7 +43,7 @@ client.send("räksmörgås");
 
 ### Server
 
-The server handles all upgrade requests as defined in version 13 of the WebSocket protocol. It can be attached to an existing HTTP or HTTPS server through the `.getRequestHandler()` method.
+The server handles all upgrade requests as defined in version 13 of the WebSocket protocol. It can be attached to an existing HTTP or HTTPS server using either the `.getRequestHandler()` method or the `.getUpgradeHandler()` method as show below.
 
 ```ts
 import * as libhttp from "http";
@@ -51,6 +51,14 @@ import { WebSocketServer } from "@joelek/ts-sockets";
 
 let server = new WebSocketServer();
 libhttp.createServer(server.getRequestHandler()).listen();
+```
+
+```ts
+import * as libhttp from "http";
+import { WebSocketServer } from "@joelek/ts-sockets";
+
+let server = new WebSocketServer();
+libhttp.createServer().on("upgrade", server.getUpgradeHandler()).listen();
 ```
 
 The server supports adding and removing of strongly-typed event listeners through the `.addEventListener()` and `.removeEventListener()` methods. You can easily keep track of active connections and sessions using the `connection_id` member attached to each event emitted.

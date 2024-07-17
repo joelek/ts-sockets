@@ -8,6 +8,8 @@ import * as is from "./is";
 import * as shared from "./shared";
 import * as utils from "./utils";
 
+type UpgradeListener = (request: libhttp.IncomingMessage, socket: libnet.Socket) => void;
+
 type WebSocketServerConnectMessage = {
 	connection_id: string;
 	connection_url: string;
@@ -37,11 +39,135 @@ function makeConnectionUrl(request: libhttp.IncomingMessage): string {
 	return `${protocol}//${host}${path}`;
 }
 
+function writeResponseStatusAndHeaders(request: libhttp.IncomingMessage, socket: libnet.Socket, statusCode: number, headers?: libhttp.OutgoingHttpHeaders | libhttp.OutgoingHttpHeader[]): number {
+	let lines = [
+		`HTTP/${request.httpVersion} ${statusCode}`
+	];
+	if (headers != null) {
+		if (Array.isArray(headers)) {
+			for (let header of headers) {
+				if (header == null) {
+					continue;
+				}
+				if (Array.isArray(header)) {
+					for (let value of header) {
+						lines.push(value);
+					}
+				} else {
+					lines.push(`${header}`);
+				}
+			}
+		} else {
+			for (let key in headers) {
+				let header = headers[key];
+				if (header == null) {
+					continue;
+				}
+				if (Array.isArray(header)) {
+					for (let value of header) {
+						lines.push(`${key}: ${value}`);
+					}
+				} else {
+					lines.push(`${key}: ${header}`);
+				}
+			}
+		}
+	}
+	lines.push("");
+	socket.write(lines.map((line) => `${line}\r\n`).join(""));
+	return statusCode;
+}
+
 export class WebSocketServer {
 	private pending_chunks: Map<string, Array<Buffer>>;
 	private states: Map<string, shared.ReadyState>;
 	private connections: utils.BiMap<string, libnet.Socket>;
 	private router: stdlib.routing.MessageRouter<WebSocketServerMessageMap>;
+
+	private writeResponseStatusAndHeaders(request: libhttp.IncomingMessage, socket: libnet.Socket): number {
+		let connection_id = this.connections.key(socket);
+		if (is.present(connection_id)) {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let major = request.httpVersionMajor;
+		let minor = request.httpVersionMinor;
+		if (major < 1 || (major === 1 && minor < 1)) {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let method = request.method;
+		if (method !== "GET") {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let host = utils.getHeader(request, "Host");
+		if (is.absent(host)) {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let upgrade = utils.getHeader(request, "Upgrade");
+		if (is.absent(upgrade) || upgrade.toLowerCase() !== "websocket") {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let connection = utils.getHeader(request, "Connection");
+		if (is.absent(connection) || connection.toLowerCase() !== "upgrade") {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let key = utils.getHeader(request, "Sec-WebSocket-Key");
+		if (is.absent(key) || Buffer.from(key, "base64").length !== 16) {
+			return writeResponseStatusAndHeaders(request, socket, 400);
+		}
+		let version = utils.getHeader(request, "Sec-WebSocket-Version");
+		if (version !== "13") {
+			return writeResponseStatusAndHeaders(request, socket, 426, {
+				"Sec-WebSocket-Version": "13"
+			});
+		}
+		let accept = libcrypto.createHash("sha1")
+			.update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+			.digest("base64");
+		return writeResponseStatusAndHeaders(request, socket, 101, {
+			"Upgrade": "websocket",
+			"Connection": "Upgrade",
+			"Sec-WebSocket-Accept": accept
+		});
+	}
+
+	private setupHandlers(socket: libnet.Socket, connection_url: string) {
+		let connection_id = libcrypto.randomBytes(16).toString("hex");
+		let buffer = Buffer.alloc(0);
+		socket.on("data", (chunk) => {
+			buffer = Buffer.concat([buffer, chunk]);
+			while (true) {
+				try {
+					let state = {
+						buffer,
+						offset: 0
+					};
+					let frame = frames.decodeFrame(state);
+					this.onFrame(connection_id, connection_url, socket, frame);
+					buffer = buffer.slice(state.offset);
+				} catch (error) {
+					break;
+				}
+			}
+		});
+		socket.on("close", () => {
+			this.connections.remove(connection_id);
+			this.states.delete(connection_id);
+			this.router.route("disconnect", {
+				connection_id,
+				connection_url
+			});
+		});
+		socket.on("error", (error) => {
+			socket.end();
+		});
+		socket.setTimeout(0);
+		this.connections.add(connection_id, socket);
+		this.states.set(connection_id, shared.ReadyState.OPEN);
+		this.router.route("connect", {
+			connection_id,
+			connection_url
+		});
+	}
 
 	private onFrame(connection_id: string, connection_url: string, socket: libnet.Socket, frame: frames.WebSocketFrame): void {
 		if (frame.reserved1 !== 0 || frame.reserved2 !== 0 || frame.reserved3 !== 0) {
@@ -154,93 +280,17 @@ export class WebSocketServer {
 	getRequestHandler(): libhttp.RequestListener {
 		return (request, response) => {
 			let socket = request.socket;
-			let connection_id = this.connections.key(socket);
-			if (is.present(connection_id)) {
-				response.writeHead(400);
-				return response.end();
+			if (this.writeResponseStatusAndHeaders(request, socket) === 101) {
+				this.setupHandlers(socket, makeConnectionUrl(request));
 			}
-			let major = request.httpVersionMajor;
-			let minor = request.httpVersionMinor;
-			if (major < 1 || (major === 1 && minor < 1)) {
-				response.writeHead(400);
-				return response.end();
+		};
+	}
+
+	getUpgradeHandler(): UpgradeListener {
+		return (request, socket) => {
+			if (this.writeResponseStatusAndHeaders(request, socket) === 101) {
+				this.setupHandlers(socket, makeConnectionUrl(request));
 			}
-			let method = request.method;
-			if (method !== "GET") {
-				response.writeHead(400);
-				return response.end();
-			}
-			let host = utils.getHeader(request, "Host");
-			if (is.absent(host)) {
-				response.writeHead(400);
-				return response.end();
-			}
-			let upgrade = utils.getHeader(request, "Upgrade");
-			if (is.absent(upgrade) || upgrade.toLowerCase() !== "websocket") {
-				response.writeHead(400);
-				return response.end();
-			}
-			let connection = utils.getHeader(request, "Connection");
-			if (is.absent(connection) || connection.toLowerCase() !== "upgrade") {
-				response.writeHead(400);
-				return response.end();
-			}
-			let key = utils.getHeader(request, "Sec-WebSocket-Key");
-			if (is.absent(key) || Buffer.from(key, "base64").length !== 16) {
-				response.writeHead(400);
-				return response.end();
-			}
-			let version = utils.getHeader(request, "Sec-WebSocket-Version");
-			if (version !== "13") {
-				response.writeHead(426, {
-					"Sec-WebSocket-Version": "13"
-				});
-				return response.end();
-			}
-			let accept = libcrypto.createHash("sha1")
-				.update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
-				.digest("base64");
-			response.writeHead(101, {
-				"Upgrade": "websocket",
-				"Connection": "Upgrade",
-				"Sec-WebSocket-Accept": accept
-			});
-			return response.end(() => {
-				let connection_id = libcrypto.randomBytes(16).toString("hex");
-				let connection_url = makeConnectionUrl(request);
-				let buffer = Buffer.alloc(0);
-				socket.on("data", (chunk) => {
-					buffer = Buffer.concat([buffer, chunk]);
-					while (true) {
-						try {
-							let state = {
-								buffer,
-								offset: 0
-							};
-							let frame = frames.decodeFrame(state);
-							this.onFrame(connection_id, connection_url, socket, frame);
-							buffer = buffer.slice(state.offset);
-						} catch (error) {
-							break;
-						}
-					}
-				});
-				socket.on("close", () => {
-					this.connections.remove(connection_id);
-					this.states.delete(connection_id);
-					this.router.route("disconnect", {
-						connection_id,
-						connection_url
-					});
-				});
-				socket.setTimeout(0);
-				this.connections.add(connection_id, socket);
-				this.states.set(connection_id, shared.ReadyState.OPEN);
-				this.router.route("connect", {
-					connection_id,
-					connection_url
-				});
-			});
 		};
 	}
 

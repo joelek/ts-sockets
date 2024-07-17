@@ -43,7 +43,7 @@ client.send("räksmörgås");
 
 ### Server
 
-The server handles all upgrade requests as defined in version 13 of the WebSocket protocol. It can be attached to an existing HTTP or HTTPS server using either the `.getRequestHandler()` method or the `.getUpgradeHandler()` method as show below.
+The server handles all upgrade requests as defined in version 13 of the WebSocket protocol. It can be attached to an existing HTTP or HTTPS server using either the `.getRequestHandler()` method or the `.getUpgradeHandler()` method as show below. The methods are logically equivalent but connection timeouts will be treated differently by the HTTP or HTTPS server depending on the NodeJS version used. It is recommended to attach the server using the upgrade handler.
 
 ```ts
 import * as libhttp from "http";
